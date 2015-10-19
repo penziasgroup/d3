@@ -16,14 +16,14 @@ text.parent {
 }
 
 circle {
-  fill: #ccc;
+  /*fill: #ccc;*/
   stroke: #999;
   pointer-events: all;
 }
 
 circle.parent {
-  fill: #1f77b4;
-  fill-opacity: .1;
+  /*fill: #1f77b4;*/
+  /*fill-opacity: .1;*/
   stroke: steelblue;
 }
 
@@ -46,6 +46,9 @@ circle.child {
     <script type="text/javascript" src="js/d3.js"></script>
     <script type="text/javascript" src="js/d3.layout.js"></script>
     <script type="text/javascript">
+	var people = {};
+	var default_picture = "http://bcs.dev/sites/default/files/default_images/profile.jpg";
+    
     function parse_faculty(data){
     	
     	// converts the faculty data returned from the Drupal view into a flare compatible data structure
@@ -63,23 +66,39 @@ circle.child {
     	var name;
     	var size;
     	
-    	for (var i = 0; i < data.people.length; i++) {
-    		person = data.people[i].person;    		
-			name = person['First Name'] + " " +  person['Last Name'];			
-    		uid = person['Uid'];
-    		area_of_research = person['Area of Research'].split('!');
-    		area_of_research_id = person['Area of Research ID'].split('!');
-    		image_url = person['Picture'].src;
-    		for (var a = 0; a < area_of_research.length; a++) {
-    			id = uid + "_" + area_of_research_id[a]; // concatenate uid and area of research to give each circle a unique id
-    			if (area_of_research[a].trim() != "" ) {
-    				if (track[area_of_research[a]] == undefined) {
-    					track[area_of_research[a]] = new Array();
-    				}
-        			track[area_of_research[a]].push({"id":id,"uid":uid,"name":name,"image_url":image_url,"size":1});
-    			}
-    		}    		
-    	}
+		for (var i = 0; i < data.people.length; i++) {
+			person = data.people[i].person;
+			name = person['First Name'] + " " + person['Last Name'];
+			uid = person['Uid'];
+			area_of_research = person['Area of Research'].split('!');
+			area_of_research_id = person['Area of Research ID'].split('!');
+			image_url = person['Picture'].src;
+			if (image_url == undefined) {
+				console.log(name + " has undefined image");
+				image_url = default_picture;
+			}
+			people[uid] = {
+				"uid" : uid,
+				"name" : name,
+				"image_url" : image_url
+			};
+
+			for (var a = 0; a < area_of_research.length; a++) {
+				id = uid + "_" + area_of_research_id[a]; // concatenate uid and area of research to give each circle a unique id
+				if (area_of_research[a].trim() != "") {
+					if (track[area_of_research[a]] == undefined) {
+						track[area_of_research[a]] = new Array();
+					}
+					track[area_of_research[a]].push({
+						"id" : id,
+						"uid" : uid,
+						"name" : name,
+						"image_url" : image_url,
+						"size" : 1
+					});
+				}
+			}
+		}
     	
     	//console.log(track);
     	
@@ -119,6 +138,38 @@ var vis = d3.select("body").insert("svg:svg", "h2")
 // get bcs people and convert to nested object based on dlc and person type
 d3.json("get_faculty.php",function(data){
 	data = parse_faculty(data);
+	
+	d3.select("svg").insert("defs","g");
+
+	// create patterns for each person image
+	for (p in people) {
+		d3.select("svg defs")
+			.append('svg:pattern')
+				.attr('id','img_' + p)
+				.attr('x', '0%')
+				.attr('y', '0%')
+				.attr('width', '100%')
+				.attr('height', '100%')
+				.attr('viewBox','0 0 250 250')
+				.attr('patternUnits','userSpaceOnUse')
+				.append("svg:image")
+					.attr('id','_img_' + p)					
+					.attr("xlink:href",people[p].image_url)
+					.attr('width', '250')
+					.attr('height', '250')
+					.attr('x', '0%')
+					.attr('y', '0%');
+	}
+
+/*
+	<pattern id="image" x="0%" y="0%" height="100%" width="100%"
+        viewBox="0 0 250 250">
+		<image xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://bcs.dev/sites/default/files/user-pics/DiCarlo%20150731%20primary%20color%20resized.jpg" width="250" height="250" x="0%" y="0%"></image>
+	</pattern>
+*/	
+	
+	
+	
 	console.log(data);
  	node = root = data;
 
@@ -138,6 +189,12 @@ d3.json("get_faculty.php",function(data){
     	})
       .attr("cy", function(d) { return d.y; })
       .attr("r", function(d) { return d.r; })
+      .style("fill", function(d) {
+    	var f = "url(#img_" + d.uid + ")";
+		console.log(f);
+		return f;
+		//return "#ff0000";
+      })
       .on("click", function(d) { return zoom(node == d ? root : d); });
 
   vis.selectAll("text")
